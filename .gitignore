@@ -1,0 +1,8 @@
+*.jpg
+*.png
+*.csv
+*.txt
+.ipynb_checkpoints/
+__pycache__/
+
+.gitignore~
