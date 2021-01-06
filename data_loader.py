@@ -2,6 +2,7 @@ import cv2
 import csv
 import os
 import numpy as np
+import pandas as pd
 import random
 import argparse
 from tqdm import tqdm
@@ -19,25 +20,24 @@ class LoadFromCsv():
 
     def load_csv(self):
         PATH = self.csv_path
-        data = [] #(name, x_uppr, y_uppr, w, h)
-        with open(PATH, newline="") as csvfile:
-            csvfile = csv.reader(csvfile)
-            for file in csvfile:
-                if file not in data: #checks for duplicates. this step is slow.
-                # quick fix for no_worm in csv
-                    if file[1] == "no_worms":
-                        pass
-                    else:
-                        data.append(file)
-                else:
-                    pass
-        return(data)
+        df = pd.read_csv(PATH, header=None)
+        df = df.drop_duplicates()
+        df = df.reset_index()
+        return df
 
     def dictionize_csv(self):
-        data = self.load_csv()
-        for row in data:
-            img_name = row[0]
-            self.csv_dict.setdefault(img_name, []).append(row[1:])
+        df = self.load_csv()
+        csv_dict = {}
+        for i in tqdm(range(len(df))):
+            row = list(df.loc[i])
+            img_name = row[1]
+
+            if "exp" in img_name and "no_worm" not in row[2]:
+                csv_dict.setdefault(img_name, []).append(row[2:])
+            else:
+                pass
+
+        self.csv_dict = csv_dict
 
 ## creates maping generator object
 class MapGenerator():
@@ -178,7 +178,7 @@ class CutImage(MapGenerator):
 
             #print(test, bb, x1y1, x2y2)
             ## set only one to be true if you want to include bbs that are partially within frame
-            if test["worm_x1y1"] == True and test["worm_x2y2"] == True:
+            if test["worm_x1y1"] == True or test["worm_x2y2"] == True:
                 # adjust for shift in position after cutting
                 adj_x = xcorner - x1y1[0]
                 adj_y = ycorner - x1y1[1]
@@ -214,8 +214,10 @@ if __name__ == "__main__":
     TRAIN = True ## utilizes already labled boundingboxes
     CUT_SIZE = 416 ## cuts 416x416
     VAL = 0.2 ## proportion of the data that will be allocated to validation set
-    CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/compiled_11_20.csv"
-    IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/NN_posttrain_2_im/"
+    #CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/compiled_11_20.csv"
+    #IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/NN_posttrain_2_im/"
+    CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/all_data_1_5_21/all_data_1_5_21.csv"
+    IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/all_data_1_5_21/imgs"
     OUT_NAME = "416_1_4_full" ## name for the training folder
     print(f"Getting info from: \ncsv:{CSV_PATH} \nimgs:{IMAGE_PATH} \nStoring in ./return as: {OUT_NAME}")
 
@@ -238,7 +240,11 @@ if __name__ == "__main__":
 
         ## img_cuts is dict with map bounds, the cut images, and bbs for each image at matching index
         ## keys: 'keys', 'imgs', 'bbs'
-        cut_img = CutImage(img, 416, Training=True, bb_list=bb_list)
+        try:
+            cut_img = CutImage(img, 416, Training=True, bb_list=bb_list)
+        except:
+            print(f"could not find data for: {img_name}")
+
         img_cuts = cut_img.cut_image()
         ims = img_cuts["imgs"]
         all_bbs = img_cuts["bbs"]
@@ -258,8 +264,8 @@ if __name__ == "__main__":
                     # cv2.imwrite(new_img_path, im)
                     # if not bb: pass         #----#       uncomment two lines to exclude images without worms.
                     w, h = (bb[2] / CUT_SIZE), (bb[3] / CUT_SIZE)
-                    xcenter = (bb[0] + (0.5*w)) / CUT_SIZE
-                    ycenter = (bb[1] + (0.5*h)) / CUT_SIZE
+                    xcenter = bb[0] / CUT_SIZE + (0.5*w)
+                    ycenter = bb[1] / CUT_SIZE + (0.5*h)
 
                     iclass = 0 ## 0 for worm. in future can add more classes
                     out_str = f"{iclass} {xcenter} {ycenter} {w} {h}\n"
