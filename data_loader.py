@@ -32,10 +32,10 @@ class LoadFromCsv():
             row = list(df.loc[i])
             img_name = row[1]
 
-            if "exp" in img_name and "no_worm" not in row[2]:
-                csv_dict.setdefault(img_name, []).append(row[2:])
+            if 'no_worms' in row:
+                print(f"no worms: {img_name}")
             else:
-                pass
+                csv_dict.setdefault(img_name, []).append(row[2:])
 
         self.csv_dict = csv_dict
 
@@ -168,7 +168,7 @@ class CutImage(MapGenerator):
         """Finds bounding boxes within the frame bounds and returns list of bbs"""
         bbs_in_frame = []
         for bb in self.bb_list:
-            bb = [int(n) for n in bb]
+            bb = [float(n) for n in bb]
             xcorner, ycorner, w, h = bb
             worm_x1y1, worm_x2y2 = (xcorner, ycorner), (xcorner+w, ycorner+h)
 
@@ -178,7 +178,7 @@ class CutImage(MapGenerator):
 
             #print(test, bb, x1y1, x2y2)
             ## set only one to be true if you want to include bbs that are partially within frame
-            if test["worm_x1y1"] == True or test["worm_x2y2"] == True:
+            if test["worm_x1y1"] == True and test["worm_x2y2"] == True:
                 # adjust for shift in position after cutting
                 adj_x = xcorner - x1y1[0]
                 adj_y = ycorner - x1y1[1]
@@ -228,11 +228,20 @@ if __name__ == "__main__":
     else:
         print("Warning! \nPath already Exists.... Clean up file tree")
 
-
     data = LoadFromCsv(CSV_PATH, IMAGE_PATH)
     bb_data = data.csv_dict
-    img_names = data.img_names
+
+    ## get rid of images that dont have any baounding box data
+    img_names = []
+    for name in data.img_names:
+        names_w_data = list(data.csv_dict.keys())
+        if name in names_w_data:
+            img_names.append(name)
+        else:
+            pass
+
     random.shuffle(img_names)
+
     ## iterate through all images and find appropriate boxes
     for img_name in tqdm(img_names):
         img = cv2.imread(os.path.join(IMAGE_PATH, img_name))
@@ -240,10 +249,7 @@ if __name__ == "__main__":
 
         ## img_cuts is dict with map bounds, the cut images, and bbs for each image at matching index
         ## keys: 'keys', 'imgs', 'bbs'
-        try:
-            cut_img = CutImage(img, 416, Training=True, bb_list=bb_list)
-        except:
-            print(f"could not find data for: {img_name}")
+        cut_img = CutImage(img, 416, Training=True, bb_list=bb_list)
 
         img_cuts = cut_img.cut_image()
         ims = img_cuts["imgs"]
@@ -266,10 +272,11 @@ if __name__ == "__main__":
                     w, h = (bb[2] / CUT_SIZE), (bb[3] / CUT_SIZE)
                     xcenter = bb[0] / CUT_SIZE + (0.5*w)
                     ycenter = bb[1] / CUT_SIZE + (0.5*h)
-
-                    iclass = 0 ## 0 for worm. in future can add more classes
-                    out_str = f"{iclass} {xcenter} {ycenter} {w} {h}\n"
-                    label_file.write(out_str)
+                    # to avoid having center values outside [0,1] bounds
+                    if 1 > xcenter > 0  or 1 > ycenter > 0:
+                        iclass = 0 ## 0 for worm. in future can add more classes
+                        out_str = f"{iclass} {xcenter} {ycenter} {w} {h}\n"
+                        label_file.write(out_str)
 
             number_of_ims = len(ims)
             val_count = 0.2 * number_of_ims
@@ -277,12 +284,12 @@ if __name__ == "__main__":
             if i < val_count:
                 ## write path location for val file
                 with open(f"./return/{OUT_NAME}/valid.txt", "a+") as val_file:
-                    val_string = (f"{OUT_NAME}/images/{new_img_name}.png")
+                    val_string = (f"{OUT_NAME}/images/{new_img_name}.png\n")
                     val_file.write(val_string)
 
             elif i > val_count:
                 with open(f"./return/{OUT_NAME}/train.txt", "a+") as train_file:
-                    train_string = (f"{OUT_NAME}/images/{new_img_name}.png")
+                    train_string = (f"{OUT_NAME}/images/{new_img_name}.png\n")
                     train_file.write(train_string)
 
     ## make last necessary files
