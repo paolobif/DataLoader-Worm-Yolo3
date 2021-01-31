@@ -4,7 +4,11 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
+<<<<<<< HEAD:check_output.py
 DIRECTORY = "./return/416_1_27_AD"
+=======
+DIRECTORY = "../return/416_1_4_full"
+>>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c:data_utils/check_output.py
 CUT_SIZE = 416
 
 parser = argparse.ArgumentParser()
@@ -35,9 +39,10 @@ class Mini_Frame():
         im = cv2.imread(IMAGE_PATH+self.name_img)
         y_size, x_size = im.shape[0], im.shape[1]
         for bound in self.bounds:
-            print(bound)
+            print(self.name_img)
             center_x, center_y = float(bound[1])*416, float(bound[2])*416
-            bounds_x, bounds_y = float(bound[3])*416 , float(bound[4])*416
+            bounds_x, bounds_y = float(bound[3])*416/2 , float(bound[4])*416/2
+            cv2.circle(im, (int(center_x), int(center_y)), 10, (255,255,0), -1)
             #center_x , center_y = float(bound[1])*x_size, float(bound[2])*y_size
             #bounds_x , bounds_y = float(bound[3])*x_size*0.5, float(bound[4])*y_size*0.5
             upper = (int(center_x - bounds_x), int(center_y - bounds_y)) #(upper left, x,y)

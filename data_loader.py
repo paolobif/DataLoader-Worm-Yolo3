@@ -21,19 +21,10 @@ class LoadFromCsv():
 
     def load_csv(self):
         PATH = self.csv_path
-        data = [] #(name, x_uppr, y_uppr, w, h)
-        with open(PATH, newline="") as csvfile:
-            csvfile = csv.reader(csvfile)
-            for file in csvfile:
-                if file not in data: #checks for duplicates. this step is slow.
-                # quick fix for no_worm in csv
-                    if file[1] == "no_worms":
-                        pass
-                    else:
-                        data.append(file)
-                else:
-                    pass
-        return(data)
+        df = pd.read_csv(PATH, header=None)
+        df = df.drop_duplicates()
+        df = df.reset_index()
+        return df
 
     def get_unique(self):
         df = pd.read_csv(self.csv_path)
@@ -47,8 +38,23 @@ class LoadFromCsv():
         self.df_dict = df_dict
 
     def dictionize_csv(self):
+<<<<<<< HEAD
         data = self.load_csv()
         csv_dict = {}
+=======
+        df = self.load_csv()
+        csv_dict = {}
+        for i in tqdm(range(len(df))):
+            row = list(df.loc[i])
+            img_name = row[1]
+
+            if 'no_worms' in row:
+                print(f"no worms: {img_name}")
+            else:
+                csv_dict.setdefault(img_name, []).append(row[2:])
+
+        self.csv_dict = csv_dict
+>>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
 
         for row in tqdm(data[1:]):
             print(row)
@@ -197,8 +203,11 @@ class CutImage(MapGenerator):
         """Finds bounding boxes within the frame bounds and returns list of bbs"""
         bbs_in_frame = []
         for bb in self.bb_list:
+<<<<<<< HEAD
             iclass = bb[4]
             bb = bb[:4] #isolates only bounding boxes, excludes class
+=======
+>>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
             bb = [float(n) for n in bb]
             xcorner, ycorner, w, h = bb
             worm_x1y1, worm_x2y2 = (xcorner, ycorner), (xcorner+w, ycorner+h)
@@ -245,10 +254,18 @@ if __name__ == "__main__":
     TRAIN = True ## utilizes already labled boundingboxes
     CUT_SIZE = 416 ## cuts 416x416
     VAL = 0.2 ## proportion of the data that will be allocated to validation set
+<<<<<<< HEAD
     DATA_CAP = 15000 ## number of image slices to cap the dataset size to
     CSV_PATH = "/home/mlcomp/sambashare/data/ad-all-samp.csv"
     IMAGE_PATH = "/home/mlcomp/sambashare/data/AD-raw-samp"
     OUT_NAME = "416_1_27_AD" ## name for the training folder
+=======
+    #CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/compiled_11_20.csv"
+    #IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/NN_posttrain_2_im/"
+    CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/all_data_1_5_21/all_data_1_5_21.csv"
+    IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/all_data_1_5_21/imgs"
+    OUT_NAME = "416_1_4_full" ## name for the training folder
+>>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
     print(f"Getting info from: \ncsv:{CSV_PATH} \nimgs:{IMAGE_PATH} \nStoring in ./return as: {OUT_NAME}")
 
     if not os.path.exists(f"./return/{OUT_NAME}"):
@@ -258,10 +275,14 @@ if __name__ == "__main__":
     else:
         print("Warning! \nPath already Exists.... Clean up file tree")
 
+<<<<<<< HEAD
     print("Loading CSV")
+=======
+>>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
     data = LoadFromCsv(CSV_PATH, IMAGE_PATH)
     print("CSV Loaded")
     bb_data = data.csv_dict
+<<<<<<< HEAD
     img_names = data.img_names
 
     #cleans up list of images
@@ -273,6 +294,20 @@ if __name__ == "__main__":
             images_to_process.append(img_name)
 
     random.shuffle(images_to_process)
+=======
+
+    ## get rid of images that dont have any baounding box data
+    img_names = []
+    for name in data.img_names:
+        names_w_data = list(data.csv_dict.keys())
+        if name in names_w_data:
+            img_names.append(name)
+        else:
+            pass
+
+    random.shuffle(img_names)
+
+>>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
     ## iterate through all images and find appropriate boxes
     for img_name in tqdm(images_to_process):
         img = cv2.imread(os.path.join(IMAGE_PATH, img_name))
@@ -281,6 +316,7 @@ if __name__ == "__main__":
         ## img_cuts is dict with map bounds, the cut images, and bbs for each image at matching index
         ## keys: 'keys', 'imgs', 'bbs'
         cut_img = CutImage(img, 416, Training=True, bb_list=bb_list)
+
         img_cuts = cut_img.cut_image()
         ims = img_cuts["imgs"]
         all_bbs = img_cuts["bbs"]
@@ -300,11 +336,16 @@ if __name__ == "__main__":
                     # cv2.imwrite(new_img_path, im)
 
                     w, h = (bb[2] / CUT_SIZE), (bb[3] / CUT_SIZE)
+<<<<<<< HEAD
                     xcenter = (bb[0] + (0.5*w)) / CUT_SIZE
                     ycenter = (bb[1] + (0.5*h)) / CUT_SIZE
 
                     ## 0 for worm. 1 for deadworm.
                     iclass = bb[4]
+=======
+                    xcenter = bb[0] / CUT_SIZE + (0.5*w)
+                    ycenter = bb[1] / CUT_SIZE + (0.5*h)
+>>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
                     # to avoid having center values outside [0,1] bounds
                     if 1 > xcenter > 0  or 1 > ycenter > 0:
                         iclass = 0 ## 0 for worm. in future can add more classes
