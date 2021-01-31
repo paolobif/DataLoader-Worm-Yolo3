@@ -15,19 +15,17 @@ class LoadFromCsv():
         self.csv_path = csv_path
         self.img_paths = img_paths
         self.img_names = os.listdir(img_paths)
-        #self.csv_dict = {}
-
         self.dictionize_csv()
 
     def load_csv(self):
         PATH = self.csv_path
-        df = pd.read_csv(PATH, header=None)
+        df = pd.read_csv(PATH)
         df = df.drop_duplicates()
-        df = df.reset_index()
+        #df = df.reset_index()
         return df
 
     def get_unique(self):
-        df = pd.read_csv(self.csv_path)
+        df = pd.read_csv(self.csv_path, index=False, header=False)
         unique_names = df['frame'].unique()
         df_dict = {}
 
@@ -38,27 +36,14 @@ class LoadFromCsv():
         self.df_dict = df_dict
 
     def dictionize_csv(self):
-<<<<<<< HEAD
         data = self.load_csv()
         csv_dict = {}
-=======
-        df = self.load_csv()
-        csv_dict = {}
-        for i in tqdm(range(len(df))):
-            row = list(df.loc[i])
-            img_name = row[1]
-
-            if 'no_worms' in row:
-                print(f"no worms: {img_name}")
-            else:
-                csv_dict.setdefault(img_name, []).append(row[2:])
-
-        self.csv_dict = csv_dict
->>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
-
-        for row in tqdm(data[1:]):
+        # Organizes data into the CSV dictionary
+        for row in tqdm(data.iterrows()):
+            row = row[1]
             print(row)
             img_name = row[0]
+            print(img_name)
             iclass = row[5]
             val = 1 if iclass == 'deadworm' else 0 ## sets worm class to int value. 0 = alive 1 = dead
             # adds encoded class of the worm`
@@ -66,11 +51,10 @@ class LoadFromCsv():
             ## this is adjusted to compensate for that. normally *.append([row[1], row[2]... etc])
             x1, y1 = float(row[1]), float(row[2])
             w, h = float(row[3]), float(row[4])
-            w = float(w)/2
-            h = float(h)/2
-            csv_dict.setdefault(img_name, []).append([x1+w, y1+h, w, h, val])
+            sftx = float(w)/2
+            sfty = float(h)/2
+            csv_dict.setdefault(img_name, []).append([x1+sftx, y1+sfty, w, h, val])
             #self.df_dict[img_name].append([row[1], row[2], row[3], row[4], val])
-
         self.csv_dict = csv_dict
 
 ## creates maping generator objectls
@@ -191,10 +175,10 @@ class CutImage(MapGenerator):
             if img_crop.shape != (self.cut_size, self.cut_size):
                 img_crop = self.add_padding_to_square_img(img_crop, self.cut_size)
 
-            img_cuts.setdefault("keys", []).append(xy_pair)
-            img_cuts.setdefault("imgs", []).append(img_crop)
-            if self.Training == True:
-                bbs_in_frame = self.check_if_bb_in_frame(x1y1, x2y2)
+            bbs_in_frame = self.check_if_bb_in_frame(x1y1, x2y2)
+            if len(bbs_in_frame) > 0:
+                img_cuts.setdefault("keys", []).append(xy_pair)
+                img_cuts.setdefault("imgs", []).append(img_crop)
                 img_cuts.setdefault("bbs", []).append(bbs_in_frame)
 
         return img_cuts
@@ -203,11 +187,9 @@ class CutImage(MapGenerator):
         """Finds bounding boxes within the frame bounds and returns list of bbs"""
         bbs_in_frame = []
         for bb in self.bb_list:
-<<<<<<< HEAD
             iclass = bb[4]
             bb = bb[:4] #isolates only bounding boxes, excludes class
-=======
->>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
+
             bb = [float(n) for n in bb]
             xcorner, ycorner, w, h = bb
             worm_x1y1, worm_x2y2 = (xcorner, ycorner), (xcorner+w, ycorner+h)
@@ -247,25 +229,28 @@ class CutImage(MapGenerator):
         else:
             return False
 
-
+## Helper functions
+def filer_empty_imgs(img_cuts):
+    ims = img_cuts["imgs"]
+    all_bbs = img_cuts["bbs"]
+    new_dict = {}
+    for im, bbs in zip(ims, all_bbs):
+        if bbs != None:
+            new_dict.setdefault("bbs", []).append(bbs)
+            new_dict.setdefault("imgs", [].append(im))
+    return new_dict
 
 
 if __name__ == "__main__":
     TRAIN = True ## utilizes already labled boundingboxes
     CUT_SIZE = 416 ## cuts 416x416
     VAL = 0.2 ## proportion of the data that will be allocated to validation set
-<<<<<<< HEAD
     DATA_CAP = 15000 ## number of image slices to cap the dataset size to
-    CSV_PATH = "/home/mlcomp/sambashare/data/ad-all-samp.csv"
-    IMAGE_PATH = "/home/mlcomp/sambashare/data/AD-raw-samp"
+    IGNORE_EMPTY = True
+    CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/AD-data/ad-all-samp.csv"
+    IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/AD-data/AD-raw-samp"
     OUT_NAME = "416_1_27_AD" ## name for the training folder
-=======
-    #CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/compiled_11_20.csv"
-    #IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/NN_posttrain_2_im/"
-    CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/all_data_1_5_21/all_data_1_5_21.csv"
-    IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/all_data_1_5_21/imgs"
-    OUT_NAME = "416_1_4_full" ## name for the training folder
->>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
+
     print(f"Getting info from: \ncsv:{CSV_PATH} \nimgs:{IMAGE_PATH} \nStoring in ./return as: {OUT_NAME}")
 
     if not os.path.exists(f"./return/{OUT_NAME}"):
@@ -275,14 +260,11 @@ if __name__ == "__main__":
     else:
         print("Warning! \nPath already Exists.... Clean up file tree")
 
-<<<<<<< HEAD
+
     print("Loading CSV")
-=======
->>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
     data = LoadFromCsv(CSV_PATH, IMAGE_PATH)
     print("CSV Loaded")
     bb_data = data.csv_dict
-<<<<<<< HEAD
     img_names = data.img_names
 
     #cleans up list of images
@@ -294,20 +276,7 @@ if __name__ == "__main__":
             images_to_process.append(img_name)
 
     random.shuffle(images_to_process)
-=======
 
-    ## get rid of images that dont have any baounding box data
-    img_names = []
-    for name in data.img_names:
-        names_w_data = list(data.csv_dict.keys())
-        if name in names_w_data:
-            img_names.append(name)
-        else:
-            pass
-
-    random.shuffle(img_names)
-
->>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
     ## iterate through all images and find appropriate boxes
     for img_name in tqdm(images_to_process):
         img = cv2.imread(os.path.join(IMAGE_PATH, img_name))
@@ -317,7 +286,11 @@ if __name__ == "__main__":
         ## keys: 'keys', 'imgs', 'bbs'
         cut_img = CutImage(img, 416, Training=True, bb_list=bb_list)
 
+        # Gets image cuts and filters out empty images if IGNORE_EMPTY == True
         img_cuts = cut_img.cut_image()
+        #if IGNORE_EMPTY:
+        #    img_cuts = filer_empty_imgs(img_cuts)
+
         ims = img_cuts["imgs"]
         all_bbs = img_cuts["bbs"]
 
@@ -336,19 +309,13 @@ if __name__ == "__main__":
                     # cv2.imwrite(new_img_path, im)
 
                     w, h = (bb[2] / CUT_SIZE), (bb[3] / CUT_SIZE)
-<<<<<<< HEAD
                     xcenter = (bb[0] + (0.5*w)) / CUT_SIZE
                     ycenter = (bb[1] + (0.5*h)) / CUT_SIZE
 
                     ## 0 for worm. 1 for deadworm.
                     iclass = bb[4]
-=======
-                    xcenter = bb[0] / CUT_SIZE + (0.5*w)
-                    ycenter = bb[1] / CUT_SIZE + (0.5*h)
->>>>>>> 7139c5c3534c4fd66f2dbf5f4200d976deb4536c
                     # to avoid having center values outside [0,1] bounds
                     if 1 > xcenter > 0  or 1 > ycenter > 0:
-                        iclass = 0 ## 0 for worm. in future can add more classes
                         out_str = f"{iclass} {xcenter} {ycenter} {w} {h}\n"
                         label_file.write(out_str)
 
