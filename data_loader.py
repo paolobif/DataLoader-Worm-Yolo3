@@ -2,6 +2,7 @@ import cv2
 import csv
 import os
 import numpy as np
+import pandas as pd
 import random
 import argparse
 from tqdm import tqdm
@@ -14,7 +15,8 @@ class LoadFromCsv():
         self.csv_path = csv_path
         self.img_paths = img_paths
         self.img_names = os.listdir(img_paths)
-        self.csv_dict = {}
+        #self.csv_dict = {}
+
         self.dictionize_csv()
 
     def load_csv(self):
@@ -33,13 +35,39 @@ class LoadFromCsv():
                     pass
         return(data)
 
+    def get_unique(self):
+        df = pd.read_csv(self.csv_path)
+        unique_names = df['frame'].unique()
+        df_dict = {}
+
+        print("Initializing Default Dictionary")
+        for name in unique_names:
+            df_dict.setdefault(name, [])
+        print("Done")
+        self.df_dict = df_dict
+
     def dictionize_csv(self):
         data = self.load_csv()
-        for row in data:
-            img_name = row[0]
-            self.csv_dict.setdefault(img_name, []).append(row[1:])
+        csv_dict = {}
 
-## creates maping generator object
+        for row in tqdm(data[1:]):
+            print(row)
+            img_name = row[0]
+            iclass = row[5]
+            val = 1 if iclass == 'deadworm' else 0 ## sets worm class to int value. 0 = alive 1 = dead
+            # adds encoded class of the worm`
+            ## all bounding boxes from new data format is off
+            ## this is adjusted to compensate for that. normally *.append([row[1], row[2]... etc])
+            x1, y1 = float(row[1]), float(row[2])
+            w, h = float(row[3]), float(row[4])
+            w = float(w)/2
+            h = float(h)/2
+            csv_dict.setdefault(img_name, []).append([x1+w, y1+h, w, h, val])
+            #self.df_dict[img_name].append([row[1], row[2], row[3], row[4], val])
+
+        self.csv_dict = csv_dict
+
+## creates maping generator objectls
 class MapGenerator():
     """ Class generates a map grid with the specified cuts
         Takes an imput of either image or xy tuple"""
@@ -68,9 +96,10 @@ class MapGenerator():
 
         pass1 = self.map_ar(xy_shape, cut_size, (0,0))
         pass2 = self.map_ar(xy_shape, cut_size, (shiftx, shifty))
-        pass3 = self.map_ar(xy_shape, cut_size, (shiftx, 0))
-        pass4 = self.map_ar(xy_shape, cut_size, (0, shifty))
-        self.map_grids = [pass1, pass2, pass3, pass4]
+        #pass3 = self.map_ar(xy_shape, cut_size, (shiftx, 0))
+        #pass4 = self.map_ar(xy_shape, cut_size, (0, shifty))
+        self.map_grids = [pass1, pass2]#, pass3, pass4]
+        #self.map_grids = [pass1]
 
         complete_map_grid = []
         for map_grid in self.map_grids:
@@ -168,7 +197,9 @@ class CutImage(MapGenerator):
         """Finds bounding boxes within the frame bounds and returns list of bbs"""
         bbs_in_frame = []
         for bb in self.bb_list:
-            bb = [int(n) for n in bb]
+            iclass = bb[4]
+            bb = bb[:4] #isolates only bounding boxes, excludes class
+            bb = [float(n) for n in bb]
             xcorner, ycorner, w, h = bb
             worm_x1y1, worm_x2y2 = (xcorner, ycorner), (xcorner+w, ycorner+h)
 
@@ -182,7 +213,7 @@ class CutImage(MapGenerator):
                 # adjust for shift in position after cutting
                 adj_x = xcorner - x1y1[0]
                 adj_y = ycorner - x1y1[1]
-                bbs_in_frame.append([adj_x, adj_y, w, h])
+                bbs_in_frame.append([adj_x, adj_y, w, h, iclass])
                 #print(bb, test)
 
         return bbs_in_frame
@@ -214,9 +245,10 @@ if __name__ == "__main__":
     TRAIN = True ## utilizes already labled boundingboxes
     CUT_SIZE = 416 ## cuts 416x416
     VAL = 0.2 ## proportion of the data that will be allocated to validation set
-    CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/compiled_11_20.csv"
-    IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/compiled_11_20/NN_posttrain_2_im/"
-    OUT_NAME = "416_1_4_full" ## name for the training folder
+    DATA_CAP = 15000 ## number of image slices to cap the dataset size to
+    CSV_PATH = "/home/mlcomp/sambashare/data/ad-all-samp.csv"
+    IMAGE_PATH = "/home/mlcomp/sambashare/data/AD-raw-samp"
+    OUT_NAME = "416_1_27_AD" ## name for the training folder
     print(f"Getting info from: \ncsv:{CSV_PATH} \nimgs:{IMAGE_PATH} \nStoring in ./return as: {OUT_NAME}")
 
     if not os.path.exists(f"./return/{OUT_NAME}"):
@@ -226,13 +258,23 @@ if __name__ == "__main__":
     else:
         print("Warning! \nPath already Exists.... Clean up file tree")
 
-
+    print("Loading CSV")
     data = LoadFromCsv(CSV_PATH, IMAGE_PATH)
+    print("CSV Loaded")
     bb_data = data.csv_dict
     img_names = data.img_names
-    random.shuffle(img_names)
+
+    #cleans up list of images
+    images = os.listdir(IMAGE_PATH)
+    imgs_with_data = list(bb_data.keys())
+    images_to_process = []
+    for img_name in images:
+        if img_name in imgs_with_data:
+            images_to_process.append(img_name)
+
+    random.shuffle(images_to_process)
     ## iterate through all images and find appropriate boxes
-    for img_name in tqdm(img_names):
+    for img_name in tqdm(images_to_process):
         img = cv2.imread(os.path.join(IMAGE_PATH, img_name))
         bb_list = bb_data[img_name]
 
@@ -256,27 +298,35 @@ if __name__ == "__main__":
                 for bb in bbs:
                     ## scale bounding boxes to 0-1 and convert to center xy w h
                     # cv2.imwrite(new_img_path, im)
-                    # if not bb: pass         #----#       uncomment two lines to exclude images without worms.
+
                     w, h = (bb[2] / CUT_SIZE), (bb[3] / CUT_SIZE)
                     xcenter = (bb[0] + (0.5*w)) / CUT_SIZE
                     ycenter = (bb[1] + (0.5*h)) / CUT_SIZE
 
-                    iclass = 0 ## 0 for worm. in future can add more classes
-                    out_str = f"{iclass} {xcenter} {ycenter} {w} {h}\n"
-                    label_file.write(out_str)
+                    ## 0 for worm. 1 for deadworm.
+                    iclass = bb[4]
+                    # to avoid having center values outside [0,1] bounds
+                    if 1 > xcenter > 0  or 1 > ycenter > 0:
+                        iclass = 0 ## 0 for worm. in future can add more classes
+                        out_str = f"{iclass} {xcenter} {ycenter} {w} {h}\n"
+                        label_file.write(out_str)
 
+            # allows restriction of dataset size to DATA_CAP
             number_of_ims = len(ims)
+            if number_of_ims > DATA_CAP:
+                number_of_ims = DATA_CAP
+
             val_count = 0.2 * number_of_ims
 
             if i < val_count:
                 ## write path location for val file
                 with open(f"./return/{OUT_NAME}/valid.txt", "a+") as val_file:
-                    val_string = (f"{OUT_NAME}/images/{new_img_name}.png")
+                    val_string = (f"{OUT_NAME}/images/{new_img_name}.png\n")
                     val_file.write(val_string)
 
-            elif i > val_count:
+            elif i < number_of_ims and i > val_count:   # makes sure training data adheres to data cap
                 with open(f"./return/{OUT_NAME}/train.txt", "a+") as train_file:
-                    train_string = (f"{OUT_NAME}/images/{new_img_name}.png")
+                    train_string = (f"{OUT_NAME}/images/{new_img_name}.png\n")
                     train_file.write(train_string)
 
     ## make last necessary files

@@ -4,7 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-DIRECTORY = "./return/416_1_4_full"
+DIRECTORY = "./return/416_1_27_AD"
 CUT_SIZE = 416
 
 parser = argparse.ArgumentParser()
@@ -19,10 +19,11 @@ img_names = list((i.split(".png")[0] for i in img_names))
 
 
 class Mini_Frame():
-    def __init__(self, name):
+    def __init__(self, name, headless=False):
         self.name_txt = name + ".txt"
         self.name_img = name + ".png"
         self.bounds = []
+        self.headless = headless # if there is no gui headless = True
 
         with open((LABEL_PATH+self.name_txt), "r") as text:
             for line in text:
@@ -42,12 +43,23 @@ class Mini_Frame():
             upper = (int(center_x - bounds_x), int(center_y - bounds_y)) #(upper left, x,y)
             lower = (int(center_x + bounds_x), int(center_y + bounds_y)) #bottom right (x,y)
 
-            cv2.rectangle(im, upper, lower, (255,0,0), 2)
+            iclass = int(bound[0])
+            if iclass == 0: #alive worm is 0
+                print("Alive")
+                cv2.rectangle(im, upper, lower, (0,255,0), 2)
+            elif iclass == 1: #dead worm is 1
+                print("Dead")
+                cv2.rectangle(im, upper, lower, (255,0,0), 2)
 
-        cv2.imshow("test", im)
-        key = cv2.waitKey(0)
-        cv2.destroyWindow("test")
+            #print(upper, lower, self.name_img, iclass)
 
+        if not self.headless:
+            cv2.imshow("test", im)
+            key = cv2.waitKey(0)
+            cv2.destroyWindow("test")
+        elif self.headless:
+
+            cv2.imwrite(f"{DIRECTORY}/{self.name_img}", im)
 
 
 
@@ -57,7 +69,7 @@ if __name__ == "__main__":
     def cycle_images(number):
         rand_list = np.random.randint(len(img_names), size=number)
         for i in rand_list:
-            mini_im = Mini_Frame(img_names[i])
+            mini_im = Mini_Frame(img_names[i], headless=True)
             mini_im.draw()
 
-    cycle_images(100)
+    cycle_images(10)
