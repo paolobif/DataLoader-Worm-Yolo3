@@ -53,7 +53,7 @@ class LoadFromCsv():
             w, h = float(row[3]), float(row[4])
             sftx = float(w)/2
             sfty = float(h)/2
-            csv_dict.setdefault(img_name, []).append([x1+sftx, y1+sfty, w, h, val])
+            csv_dict.setdefault(img_name, []).append([x1+sftx, y1+sfty, w, h, val]) #x1, y1, w, h, class
             #self.df_dict[img_name].append([row[1], row[2], row[3], row[4], val])
         self.csv_dict = csv_dict
 
@@ -161,16 +161,24 @@ class CutImage(MapGenerator):
         self.Training = Training
         self.bb_list = bb_list
 
-    def cut_image(self):
+    def cut_image(self, ratio=1):
+        """
+        Cuts the images to the map_ar grid. Ratio is the ratio of images without worms to allow
+        through the image loader. So if ratio is 1: all images without worms will make it into training.
+        If ratio is 0.3 only 30% of images with worms will make it in the training set.
+        """
         # cuts image according to map_grid and returns dict with img and keys
         img_cuts = {}
+        # Gets count
+        cuts_worms = 0
+        cuts_noworms = 0
+        # Iterate through xy_pairs in map grid
         for xy_pair in self.map_grid:
             x1y1, x2y2 = xy_pair
             x1, y1 = x1y1
             x2, y2 = x2y2
 
             img_crop = self.img[y1:y2, x1:x2]
-
             # add padding if the image is not sized correctly
             if img_crop.shape != (self.cut_size, self.cut_size):
                 img_crop = self.add_padding_to_square_img(img_crop, self.cut_size)
@@ -180,8 +188,19 @@ class CutImage(MapGenerator):
                 img_cuts.setdefault("keys", []).append(xy_pair)
                 img_cuts.setdefault("imgs", []).append(img_crop)
                 img_cuts.setdefault("bbs", []).append(bbs_in_frame)
-
+                cuts_worms += 1
+            elif len(bbs_in_frame) == 0:
+                include = random.choices([1, 0], weights=[ratio, 1-ratio], k=1) # Determines if to inclide image or not
+                if include[0]:
+                    img_cuts.setdefault("keys", []).append(xy_pair)
+                    img_cuts.setdefault("imgs", []).append(img_crop)
+                    img_cuts.setdefault("bbs", []).append(bbs_in_frame)
+        # print(f"""
+        # Cuts with worms = {cuts_worms}
+        # Cuts with NO worms = {cuts_noworms}
+        # """)
         return img_cuts
+
 
     def check_if_bb_in_frame(self, x1y1, x2y2):
         """Finds bounding boxes within the frame bounds and returns list of bbs"""
@@ -245,11 +264,11 @@ if __name__ == "__main__":
     TRAIN = True ## utilizes already labled boundingboxes
     CUT_SIZE = 416 ## cuts 416x416
     VAL = 0.2 ## proportion of the data that will be allocated to validation set
-    DATA_CAP = 15000 ## number of image slices to cap the dataset size to
-    IGNORE_EMPTY = True
+    DATA_CAP = 2000 ## number of image slices to cap the dataset size to
+    EMPTY_RATIO = 0.5  ## ratio of images without worms to include.
     CSV_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/AD-data/ad-all-samp.csv"
     IMAGE_PATH = "/home/paolobif/Lab-Work/ml/pre_arch/worm_data/AD-data/AD-raw-samp"
-    OUT_NAME = "416_1_27_AD" ## name for the training folder
+    OUT_NAME = "416_2_7_full_RAT80" ## name for the training folder
 
     print(f"Getting info from: \ncsv:{CSV_PATH} \nimgs:{IMAGE_PATH} \nStoring in ./return as: {OUT_NAME}")
 
@@ -287,7 +306,7 @@ if __name__ == "__main__":
         cut_img = CutImage(img, 416, Training=True, bb_list=bb_list)
 
         # Gets image cuts and filters out empty images if IGNORE_EMPTY == True
-        img_cuts = cut_img.cut_image()
+        img_cuts = cut_img.cut_image(ratio=EMPTY_RATIO)
         #if IGNORE_EMPTY:
         #    img_cuts = filer_empty_imgs(img_cuts)
 
