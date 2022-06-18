@@ -61,8 +61,9 @@ class LoadFromCsv():
 class MapGenerator():
     """ Class generates a map grid with the specified cuts
         Takes an imput of either image or xy tuple"""
-    def __init__(self, xy_shape, cut_size):
+    def __init__(self, xy_shape, cut_size, use=[0,1]):
         self.cut_size = cut_size
+        self.use = use
         if type(xy_shape) != tuple:
             #print("input is an np img array")
             self.xy_shape = (xy_shape.shape[1], xy_shape.shape[0])
@@ -73,9 +74,9 @@ class MapGenerator():
 
         self.paired_grid = []
 
-        self.map_grid = self.generate_complete_map_grid()
+        self.map_grid = self.generate_complete_map_grid(self.use)
 
-    def generate_complete_map_grid(self):
+    def generate_complete_map_grid(self, use):
         """Four passes of map_grid need to be run in order
         to cover entire area. Returns list of points for bounds. """
         xy_shape = self.xy_shape
@@ -86,10 +87,11 @@ class MapGenerator():
 
         pass1 = self.map_ar(xy_shape, cut_size, (0,0))
         pass2 = self.map_ar(xy_shape, cut_size, (shiftx, shifty))
-        #pass3 = self.map_ar(xy_shape, cut_size, (shiftx, 0))
-        #pass4 = self.map_ar(xy_shape, cut_size, (0, shifty))
-        self.map_grids = [pass1, pass2]#, pass3, pass4]
-        #self.map_grids = [pass1]
+        pass3 = self.map_ar(xy_shape, cut_size, (shiftx, 0))
+        pass4 = self.map_ar(xy_shape, cut_size, (0, shifty))
+        map_grids = [pass1, pass2, pass3, pass4]
+        
+        self.map_grids = [map_grids[i] for i in use]
 
         complete_map_grid = []
         for map_grid in self.map_grids:
