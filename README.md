@@ -16,8 +16,8 @@ $ pip install -r requirements.txt
 In [data_loader.py](data_loader.py):
 
 ```
-    TRAIN = True ## utilizes already labled boundingboxes
-    CUT_SIZE = 416 ## cuts 416x416 (defualt)
+    TRAIN = True ## utilizes already labeled bounding-boxes
+    CUT_SIZE = 416 ## cuts 416x416 (default)
     VAL = 0.2 ## proportion of the data that will be allocated to validation set
     DATA_CAP = 2000 ## number of image slices to cap the dataset size to
     EMPTY_RATIO = 0.5  ## ratio of images without worms to include in training.
